@@ -139,31 +139,45 @@ def sessions(limit: int = 30, user_id: int = Depends(get_current_user_id)) -> li
 
 
 @app.get("/api/sessions/{session_id}")
-def session_detail(session_id: str) -> dict:
+def session_detail(session_id: str, user_id: int = Depends(get_current_user_id)) -> dict:
+    _require_owned_session(session_id, user_id)
     result = db.get_session(session_id)
     return result or {}
 
 
+def _require_owned_session(session_id: str, user_id: int) -> None:
+    """Raises 404 (not 403) unless the session belongs to this user - a 404
+    avoids confirming whether a session with that id exists at all to
+    someone who doesn't own it."""
+    owner = db.get_session_owner(session_id)
+    if owner is None or owner != user_id:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+
 @app.patch("/api/sessions/{session_id}/rename")
-def rename_session(session_id: str, req: RenameSessionRequest) -> dict:
+def rename_session(session_id: str, req: RenameSessionRequest, user_id: int = Depends(get_current_user_id)) -> dict:
+    _require_owned_session(session_id, user_id)
     db.rename_session(session_id, req.title)
     return {"status": "renamed"}
 
 
 @app.patch("/api/sessions/{session_id}/pin")
-def pin_session(session_id: str, pinned: bool = True) -> dict:
+def pin_session(session_id: str, pinned: bool = True, user_id: int = Depends(get_current_user_id)) -> dict:
+    _require_owned_session(session_id, user_id)
     db.set_session_pinned(session_id, pinned)
     return {"status": "pinned" if pinned else "unpinned"}
 
 
 @app.delete("/api/sessions/{session_id}")
-def delete_session(session_id: str) -> dict:
+def delete_session(session_id: str, user_id: int = Depends(get_current_user_id)) -> dict:
+    _require_owned_session(session_id, user_id)
     db.delete_session(session_id)
     return {"status": "deleted"}
 
 
 @app.post("/api/sessions/{session_id}/share")
-def share_session(session_id: str) -> dict:
+def share_session(session_id: str, user_id: int = Depends(get_current_user_id)) -> dict:
+    _require_owned_session(session_id, user_id)
     token = db.get_or_create_share_token(session_id)
     if token is None:
         return {"status": "not_found"}
@@ -171,13 +185,16 @@ def share_session(session_id: str) -> dict:
 
 
 @app.delete("/api/sessions/{session_id}/share")
-def unshare_session(session_id: str) -> dict:
+def unshare_session(session_id: str, user_id: int = Depends(get_current_user_id)) -> dict:
+    _require_owned_session(session_id, user_id)
     db.revoke_share_token(session_id)
     return {"status": "revoked"}
 
 
 @app.get("/api/shared/{token}")
 def get_shared_session(token: str) -> dict:
+    # Intentionally public/unauthenticated: this is the whole point of a
+    # share link - no ownership check here.
     result = db.get_session_by_share_token(token)
     if result is None:
         return {"status": "not_found"}
@@ -185,7 +202,8 @@ def get_shared_session(token: str) -> dict:
 
 
 @app.post("/api/feedback")
-def submit_feedback(req: FeedbackRequest) -> dict:
+def submit_feedback(req: FeedbackRequest, user_id: int = Depends(get_current_user_id)) -> dict:
+    _require_owned_session(req.session_id, user_id)
     db.save_feedback(req.session_id, req.rating, req.comment)
     # Blend explicit human feedback into a small immediate policy nudge:
     # treat it as a one-step episode reinforcing the *tendency* implied by

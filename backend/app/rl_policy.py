@@ -175,7 +175,11 @@ class PolicyGradientAgent:
 
     # ------------------------------------------------------------------
     def _save(self) -> None:
-        os.makedirs(os.path.dirname(settings.rl_policy_path) or ".", exist_ok=True)
+        # Persisted to the database (Postgres in production, SQLite locally)
+        # rather than a local JSON file, so learned weights survive restarts
+        # and redeploys - a local file would be wiped on Render's free tier.
+        from . import db
+
         payload = {
             "weights": self.weights,
             "baseline": self.baseline,
@@ -184,24 +188,28 @@ class PolicyGradientAgent:
             "action_counts": self.action_counts,
         }
         try:
-            with open(settings.rl_policy_path, "w") as f:
-                json.dump(payload, f)
-        except OSError as exc:  # pragma: no cover
-            logger.warning("Could not persist RL policy: %s", exc)
+            db.save_rl_policy_state(payload)
+        except Exception as exc:  # pragma: no cover - defensive, e.g. table not yet created
+            logger.warning("Could not persist RL policy to database: %s", exc)
 
     def _load(self) -> None:
-        if not os.path.exists(settings.rl_policy_path):
+        from . import db
+
+        try:
+            payload = db.load_rl_policy_state()
+        except Exception as exc:  # pragma: no cover - e.g. table doesn't exist yet on first import
+            logger.info("RL policy state not yet available (%s) - starting fresh", exc)
+            return
+        if not payload:
             return
         try:
-            with open(settings.rl_policy_path) as f:
-                payload = json.load(f)
             self.weights = payload.get("weights", self.weights)
             self.baseline = payload.get("baseline", 0.0)
             self.episodes_trained = payload.get("episodes_trained", 0)
             self.reward_history = payload.get("reward_history", [])
             self.action_counts = payload.get("action_counts", self.action_counts)
-        except (OSError, json.JSONDecodeError) as exc:  # pragma: no cover
-            logger.warning("Could not load persisted RL policy, starting fresh: %s", exc)
+        except (AttributeError, TypeError) as exc:  # pragma: no cover
+            logger.warning("Could not parse persisted RL policy, starting fresh: %s", exc)
 
 
 def build_features(
