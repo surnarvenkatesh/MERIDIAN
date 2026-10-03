@@ -2,17 +2,18 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# System deps for sentence-transformers / chromadb wheels
+# tesseract-ocr: required for image text extraction (pytesseract wraps this
+# binary - it is not installed by the pip package alone).
+# build-essential/curl: needed for psycopg and bcrypt wheel builds, and the
+# healthcheck below.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential curl \
+    build-essential curl tesseract-ocr \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY requirements-prod.txt .
+RUN pip install --no-cache-dir -r requirements-prod.txt
 
 COPY app ./app
-
-RUN mkdir -p /app/data
 
 ENV PYTHONUNBUFFERED=1
 EXPOSE 8000
