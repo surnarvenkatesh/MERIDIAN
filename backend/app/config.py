@@ -53,6 +53,12 @@ class Settings:
     max_agent_steps: int = field(default_factory=lambda: int(os.getenv("MAX_AGENT_STEPS", "8")))
     max_sources_per_query: int = field(default_factory=lambda: int(os.getenv("MAX_SOURCES", "5")))
 
+    # Comma-separated list of allowed frontend origins for CORS, e.g.
+    # "https://meridian.vercel.app,https://meridian-git-main.vercel.app".
+    # Defaults to "*" (allow all) for local development convenience - this
+    # MUST be set to your real deployed frontend origin(s) in production.
+    cors_origins: str = field(default_factory=lambda: os.getenv("CORS_ORIGINS", "*"))
+
     # --- Demo / offline mode --------------------------------------------
     force_mock_llm: bool = field(default_factory=lambda: _bool("FORCE_MOCK_LLM", False))
 
