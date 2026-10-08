@@ -1,6 +1,17 @@
 import type { PolicySnapshot, ResearchResult, SessionSummary, StreamEvent, TraceStep } from "./types";
 
+// In local dev, VITE_API_BASE is unset, so API_BASE is "" and fetch("/api/...")
+// resolves relative to Vite's dev server, which proxies to localhost:8000
+// (see vite.config.ts). In production, VITE_API_BASE is set at build time
+// (e.g. "https://meridian-tm4f.onrender.com") so requests go directly to
+// the deployed backend on its own domain.
+const API_BASE = import.meta.env.VITE_API_BASE || "";
+
 const WS_BASE = (() => {
+  if (API_BASE) {
+    // Convert an http(s) API base into the matching ws(s) origin.
+    return API_BASE.replace(/^http/, "ws");
+  }
   const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
   return `${proto}//${window.location.host}`;
 })();
@@ -30,7 +41,7 @@ export interface AuthResponse {
 }
 
 export async function register(email: string, password: string): Promise<AuthResponse> {
-  const res = await fetch("/api/register", {
+  const res = await fetch(`${API_BASE}/api/register`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, password }),
@@ -41,7 +52,7 @@ export async function register(email: string, password: string): Promise<AuthRes
 }
 
 export async function changePassword(currentPassword: string, newPassword: string): Promise<void> {
-  const res = await fetch("/api/change-password", {
+  const res = await fetch(`${API_BASE}/api/change-password`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
@@ -51,7 +62,7 @@ export async function changePassword(currentPassword: string, newPassword: strin
 }
 
 export async function login(email: string, password: string): Promise<AuthResponse> {
-  const res = await fetch("/api/login", {
+  const res = await fetch(`${API_BASE}/api/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, password }),
@@ -62,13 +73,13 @@ export async function login(email: string, password: string): Promise<AuthRespon
 }
 
 export async function fetchPolicy(): Promise<PolicySnapshot> {
-  const res = await fetch("/api/policy", { headers: authHeaders() });
+  const res = await fetch(`${API_BASE}/api/policy`, { headers: authHeaders() });
   if (!res.ok) throw new Error("Failed to fetch policy snapshot");
   return res.json();
 }
 
 export async function fetchSessions(): Promise<SessionSummary[]> {
-  const res = await fetch("/api/sessions", { headers: authHeaders() });
+  const res = await fetch(`${API_BASE}/api/sessions`, { headers: authHeaders() });
   if (!res.ok) throw new Error("Failed to fetch sessions");
   return res.json();
 }
@@ -76,7 +87,7 @@ export async function fetchSessions(): Promise<SessionSummary[]> {
 export async function uploadFile(file: File): Promise<{ filename: string; text: string } | null> {
   const formData = new FormData();
   formData.append("file", file);
-  const res = await fetch("/api/upload", { method: "POST", headers: authHeaders(), body: formData });
+  const res = await fetch(`${API_BASE}/api/upload`, { method: "POST", headers: authHeaders(), body: formData });
   const data = await res.json();
   if (data.status !== "ok") {
     throw new Error(data.message || "Upload failed");
@@ -85,13 +96,13 @@ export async function uploadFile(file: File): Promise<{ filename: string; text: 
 }
 
 export async function fetchHealth(): Promise<{ status: string; llm_live: boolean; search_live: boolean }> {
-  const res = await fetch("/api/health");
+  const res = await fetch(`${API_BASE}/api/health`);
   if (!res.ok) throw new Error("Failed to fetch health");
   return res.json();
 }
 
 export async function renameSession(sessionId: string, title: string): Promise<void> {
-  await fetch(`/api/sessions/${sessionId}/rename`, {
+  await fetch(`${API_BASE}/api/sessions/${sessionId}/rename`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({ title }),
@@ -99,15 +110,21 @@ export async function renameSession(sessionId: string, title: string): Promise<v
 }
 
 export async function pinSession(sessionId: string, pinned: boolean): Promise<void> {
-  await fetch(`/api/sessions/${sessionId}/pin?pinned=${pinned}`, { method: "PATCH", headers: authHeaders() });
+  await fetch(`${API_BASE}/api/sessions/${sessionId}/pin?pinned=${pinned}`, {
+    method: "PATCH",
+    headers: authHeaders(),
+  });
 }
 
 export async function deleteSession(sessionId: string): Promise<void> {
-  await fetch(`/api/sessions/${sessionId}`, { method: "DELETE", headers: authHeaders() });
+  await fetch(`${API_BASE}/api/sessions/${sessionId}`, { method: "DELETE", headers: authHeaders() });
 }
 
 export async function shareSession(sessionId: string): Promise<string | null> {
-  const res = await fetch(`/api/sessions/${sessionId}/share`, { method: "POST", headers: authHeaders() });
+  const res = await fetch(`${API_BASE}/api/sessions/${sessionId}/share`, {
+    method: "POST",
+    headers: authHeaders(),
+  });
   const data = await res.json();
   return data.share_token ?? null;
 }
@@ -117,7 +134,7 @@ export async function submitFeedback(
   rating: "helpful" | "not_helpful",
   comment?: string
 ): Promise<void> {
-  await fetch("/api/feedback", {
+  await fetch(`${API_BASE}/api/feedback`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({ session_id, rating, comment }),
@@ -152,7 +169,7 @@ export function streamResearch(
     if (usedFallback || closed) return;
     usedFallback = true;
     try {
-      const res = await fetch("/api/research", {
+      const res = await fetch(`${API_BASE}/api/research`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify({ query, uploaded_documents: uploadedDocuments, conversation_history: conversationHistory }),

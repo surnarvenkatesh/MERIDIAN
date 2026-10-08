@@ -114,7 +114,9 @@ export default function App() {
 
   const selectSession = async (id: string) => {
     try {
-      const res: ResearchResult = await fetch(`/api/sessions/${id}`).then((r) => r.json());
+      const res: ResearchResult = await fetch(`${import.meta.env.VITE_API_BASE || ""}/api/sessions/${id}`, {
+        headers: getToken() ? { Authorization: `Bearer ${getToken()}` } : {},
+      }).then((r) => r.json());
       if (res && res.steps) {
         setTurns([{ id: res.session_id, question: res.query, steps: res.steps, result: res, error: null }]);
         setIsRunning(false);
