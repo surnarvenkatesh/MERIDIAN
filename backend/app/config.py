@@ -26,7 +26,7 @@ def _bool(name: str, default: bool) -> bool:
 class Settings:
     # --- LLM provider: Groq only (free, no credit card required) ---------
     groq_api_key: str | None = field(default_factory=lambda: os.getenv("GROQ_API_KEY"))
-    groq_model: str = field(default_factory=lambda: os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"))
+    groq_model: str = field(default_factory=lambda: os.getenv("GROQ_MODEL", "openai/gpt-oss-120b"))
     llm_max_tokens: int = field(default_factory=lambda: int(os.getenv("LLM_MAX_TOKENS", "2048")))
 
     # --- Web search provider (Tavily is used because it returns clean,
