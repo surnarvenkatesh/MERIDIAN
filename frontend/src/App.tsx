@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AlertCircle, CircleDot, MessageSquarePlus } from "lucide-react";
 import ProfileMenu from "./components/ProfileMenu";
 import Sidebar from "./components/Sidebar";
@@ -40,6 +40,10 @@ export default function App() {
   const [isRunning, setIsRunning] = useState(false);
   const [policy, setPolicy] = useState<PolicySnapshot | null>(null);
   const [health, setHealth] = useState<{ llm_live: boolean; search_live: boolean } | null>(null);
+  // The Sources panel follows whichever turn is in view, so the sources
+  // shown always match the answer being read, not just the latest turn.
+  const threadRef = useRef<HTMLElement>(null);
+  const [activeTurnId, setActiveTurnId] = useState<string | null>(null);
 
   const refreshSessions = () => fetchSessions().then(setSessions).catch(() => {});
   const refreshPolicy = () => fetchPolicy().then(setPolicy).catch(() => {});
@@ -56,6 +60,25 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(turns));
   }, [turns]);
+
+  useEffect(() => {
+    const root = threadRef.current;
+    if (!root) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            setActiveTurnId((entry.target as HTMLElement).dataset.turnId ?? null);
+          }
+        }
+      },
+      // A turn counts as "in view" while it crosses a band near the top of
+      // the scroll area, so the panel switches as you scroll between turns.
+      { root, rootMargin: "-15% 0px -70% 0px", threshold: 0 }
+    );
+    root.querySelectorAll("[data-turn-id]").forEach((el) => observer.observe(el));
+    return () => observer.disconnect();
+  }, [turns.length, authed]);
 
   const handleAuthenticated = (token: string, userEmail: string) => {
     setToken(token);
@@ -87,6 +110,11 @@ export default function App() {
 
     setTurns((prev) => [...prev, { id: turnId, question: query, steps: [], result: null, error: null }]);
     setIsRunning(true);
+    setTimeout(() => {
+      threadRef.current
+        ?.querySelector(`[data-turn-id="${turnId}"]`)
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 50);
 
     streamResearch(query, uploadedDocuments, conversationHistory, {
       onStep: (step) =>
@@ -131,10 +159,11 @@ export default function App() {
   }
 
   const lastTurn = turns[turns.length - 1];
-  const sourcesForDisplay: Source[] = lastTurn
-    ? lastTurn.result
-      ? lastTurn.result.sources
-      : lastTurn.steps.flatMap((s) => s.sources)
+  const shownTurn = turns.find((t) => t.id === activeTurnId) ?? lastTurn;
+  const sourcesForDisplay: Source[] = shownTurn
+    ? shownTurn.result
+      ? shownTurn.result.sources
+      : shownTurn.steps.flatMap((s) => s.sources)
     : [];
 
   return (
@@ -184,10 +213,10 @@ export default function App() {
         </header>
 
         <div className="flex min-h-0 flex-1">
-          <section className="min-w-0 flex-[2.1] overflow-y-auto px-8 py-7">
+          <section ref={threadRef} className="min-w-0 flex-[2.1] overflow-y-auto px-8 py-7">
             {turns.length === 0 && !isRunning && <TraceTimeline steps={[]} isRunning={false} />}
             {turns.map((turn) => (
-              <div key={turn.id} className="mb-8">
+              <div key={turn.id} data-turn-id={turn.id} className="mb-8">
                 <QuestionBubble
                   question={turn.question}
                   disabled={isRunning}

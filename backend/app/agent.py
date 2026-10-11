@@ -348,7 +348,7 @@ class ResearchAgent:
         system = (
             "You are an autonomous research agent writing a final answer for the user. "
             "Synthesize across the provided sources, note points of agreement and disagreement, "
-            "and flag uncertainty honestly. Cite sources inline as plain [n] only - e.g. [1], [2] - never use any other bracket style or symbols around citation numbers. Keep the answer focused — 3 to 5 sections at most, no padding sections with no real content. Always end with a short closing paragraph (2-3 sentences, no heading) that directly summarizes the answer to the original question. Write in clean, standard Markdown only — use actual newlines between list items instead of <br> tags, and use blank lines between paragraphs."
+            "and flag uncertainty honestly. Cite sources inline as plain [n] only - e.g. [1], [2] - never use any other bracket style or symbols around citation numbers. Only add a table column when the sources give real values for it - never include empty or placeholder columns. Keep the answer focused — 3 to 5 sections at most, no padding sections with no real content. Always end with a short closing paragraph (2-3 sentences, no heading) that directly summarizes the answer to the original question. Write in clean, standard Markdown only — use actual newlines between list items instead of <br> tags, and use blank lines between paragraphs."
         )
         history_context = ""
         if state.conversation_history:
