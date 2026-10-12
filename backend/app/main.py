@@ -37,7 +37,7 @@ def on_startup() -> None:
     )
 
 
-@app.get("/api/health")
+@app.api_route("/api/health", methods=["GET", "HEAD"])  # HEAD: uptime monitors probe with it
 def health() -> dict:
     return {
         "status": "ok",
