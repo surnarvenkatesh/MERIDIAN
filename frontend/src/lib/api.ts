@@ -101,6 +101,14 @@ export async function fetchHealth(): Promise<{ status: string; llm_live: boolean
   return res.json();
 }
 
+export async function fetchSharedSession(token: string): Promise<ResearchResult | null> {
+  const res = await fetch(`${API_BASE}/api/shared/${token}`);
+  if (!res.ok) return null;
+  const data = await res.json();
+  if (!data || data.status === "not_found" || !data.answer) return null;
+  return data as ResearchResult;
+}
+
 export async function renameSession(sessionId: string, title: string): Promise<void> {
   await fetch(`${API_BASE}/api/sessions/${sessionId}/rename`, {
     method: "PATCH",

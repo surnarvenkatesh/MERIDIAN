@@ -7,7 +7,7 @@ import rehypeRaw from "rehype-raw";
 import type { ResearchResult } from "../lib/types";
 import { shareSession, submitFeedback } from "../lib/api";
 
-export default function AnswerCard({ result }: { result: ResearchResult }) {
+export default function AnswerCard({ result, readOnly = false }: { result: ResearchResult; readOnly?: boolean }) {
   const [given, setGiven] = useState<"helpful" | "not_helpful" | null>(null);
   const [copied, setCopied] = useState(false);
   const [shared, setShared] = useState(false);
@@ -53,6 +53,7 @@ export default function AnswerCard({ result }: { result: ResearchResult }) {
             <button
               onClick={handleShare}
               title="Copy share link"
+              style={readOnly ? { display: "none" } : undefined}
               className="flex h-6 w-6 items-center justify-center rounded text-parchment-faint hover:bg-ink hover:text-parchment-dim"
             >
               {shared ? <Check className="h-3.5 w-3.5 text-signal-teal" /> : <Share2 className="h-3.5 w-3.5" />}
@@ -111,7 +112,7 @@ export default function AnswerCard({ result }: { result: ResearchResult }) {
         </ReactMarkdown>
       </div>
 
-      <div className="mt-5 flex items-center justify-between border-t border-ink-line pt-3.5">
+      <div style={readOnly ? { display: "none" } : undefined} className="mt-5 flex items-center justify-between border-t border-ink-line pt-3.5">
         <span className="text-[12px] text-parchment-faint">Was this research useful?</span>
         <div className="flex gap-1.5">
           <button
