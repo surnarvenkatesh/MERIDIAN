@@ -191,6 +191,34 @@ def unshare_session(session_id: str, user_id: int = Depends(get_current_user_id)
     return {"status": "revoked"}
 
 
+def _public_view(result: dict) -> dict:
+    """What an anonymous visitor may see through a share link: the question,
+    the answer and basic source info. The step-by-step trace, source snippets
+    and uploaded-file sources stay private to the owner."""
+    sources = [
+        {
+            "id": s.get("id", ""),
+            "title": s.get("title", ""),
+            "url": s.get("url", ""),
+            "domain": s.get("domain", ""),
+            "credibility_score": s.get("credibility_score"),
+            "snippet": "",
+        }
+        for s in result.get("sources", [])
+        if not str(s.get("url", "")).startswith("upload://")
+    ]
+    return {
+        "session_id": "",
+        "query": result.get("query", ""),
+        "answer": result.get("answer", ""),
+        "confidence": result.get("confidence", 0),
+        "elapsed_ms": result.get("elapsed_ms", 0),
+        "total_reward": 0,
+        "steps": [],
+        "sources": sources,
+    }
+
+
 @app.get("/api/shared/{token}")
 def get_shared_session(token: str) -> dict:
     # Intentionally public/unauthenticated: this is the whole point of a
@@ -198,7 +226,7 @@ def get_shared_session(token: str) -> dict:
     result = db.get_session_by_share_token(token)
     if result is None:
         return {"status": "not_found"}
-    return result
+    return _public_view(result)
 
 
 @app.post("/api/feedback")
